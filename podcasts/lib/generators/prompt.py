@@ -3,6 +3,8 @@ from pathlib import Path
 import logging
 from datetime import datetime
 
+from ..models.schemas import Interviewee
+
 logger = logging.getLogger(__name__)
 
 def generate_analysis_prompt(
@@ -12,86 +14,109 @@ def generate_analysis_prompt(
     share_url: str,
     transcript_filename: str,
     platform_type: str,
-    interviewee: Dict = None
+    interviewee: Interviewee,
+    duration_seconds: int
 ) -> str:
-    """Generate a ChatGPT prompt for podcast analysis in Obsidian format"""
+    """Generate analysis prompt for podcast transcript"""
     
-    prompt = f"""Analyze this timestamped podcast transcript and generate a structured note. IMPORTANT: Read the ENTIRE transcript before beginning analysis.
+    # Calculate quarter marks for the podcast
+    quarter_duration = duration_seconds // 4
+    q1 = format_timestamp(quarter_duration)
+    q2 = format_timestamp(quarter_duration * 2)
+    q3 = format_timestamp(quarter_duration * 3)
+    end = format_timestamp(duration_seconds)
+    
+    prompt = f"""ANALYZE PODCAST TRANSCRIPT: {title}
 
-FORMATTING REQUIREMENTS:
-- Use #tags for topics and themes
-- Use **bold** for emphasis
-- Include timestamps (HH:MM:SS) where relevant
-- Maintain consistent list spacing
+BEFORE STARTING:
+1. Read the entire transcript ({transcript_filename})
+2. Total Duration: {format_duration(duration_seconds)} (00:00:00 to {end})
+3. Confirm: "I have read the complete transcript from start to finish"
 
-REQUIRED SECTIONS (in order):
+METADATA
+- Title: {title}
+- Podcast: {podcast_name}
+- Guest: {interviewee.name}
+- Role: {interviewee.profession}
+- Organization: {interviewee.organization}
 
-1. QUOTES (EXACTLY 3)
-Select quotes that represent:
-- A paradigm-shifting statement
-- An emotionally resonant insight
-- A controversial claim
-Format each as:
+ANALYSIS STRUCTURE:
+
+1. KEY QUOTES (3 total, from different quarters)
+Select one quote from each time range:
+- First Quarter (00:00:00 - {q1})
+- Second Quarter ({q1} - {q2}) 
+- Third Quarter ({q2} - {q3})
+- Fourth Quarter ({q3} - {end})
+
+Format each:
 > [!quote]
-> "Quote text" - Speaker (HH:MM:SS)
-> #relevant-tags
+> "Quote text" – Speaker (HH:MM:SS)
+> ⎯tags #relevantTags
 
-NO CONTEXT OR IMPACT STATEMENT NEEDED - let quotes speak for themselves
+2. OVERVIEW
+Brief summary of core topic, unique perspective, and implications.
 
-2. OVERVIEW (2-3 SENTENCES ONLY)
-- Core topic/thesis
-- Unique perspective
-- Key implications
+3. CHRONOLOGICAL ANALYSIS
+First Quarter (00:00:00 - {q1}):
+- Key claims and points made
+- Include timestamps and tags
+- Note significant references
 
-3. CLAIMS (CRITICAL - 10 TARGET)
-Each claim must be:
-- Listed chronologically as they appear in transcript
-- Balanced between all major themes of the episode
-- Unique & substantial (no repetition)
-- Supported by transcript evidence
-- Tagged with #type and #topic
-Aim for 10 claims - fewer only if transcript lacks substance
+Second Quarter ({q1} - {q2}):
+- Key claims and points made
+- Include timestamps and tags
+- Note significant references
 
-4. FLOW
-Three key phases:
-**Opening**: Initial context and foundational concepts
-**Development**: Core arguments and evidence
-**Conclusion**: Synthesis and implications
+Third Quarter ({q2} - {q3}):
+- Key claims and points made
+- Include timestamps and tags
+- Note significant references
 
-5. REFERENCES (ALL REQUIRED)
-Books:
-- **Title** by Author (Year)
-  - Context: How/why mentioned (HH:MM:SS)
-  #book #author-[lastname] #century-[xx]
+Fourth Quarter ({q3} - {end}):
+- Key claims and points made
+- Include timestamps and tags
+- Note significant references
 
-People:
-- **Name** - Role/Position (Year)
-  - Contribution: Specific relevance (HH:MM:SS)
-  #person #field-[area] #century-[xx]
+4. REFERENCES
+Books & Publications:
+- List with context and timestamps
+- Note which quarter they appear in
 
-Technologies:
-- **[Name]**
-  - Purpose: Brief description
-  - Context: Role in discussion (HH:MM:SS)
-  #technology #field-[area] #century-[xx]
+People Mentioned:
+- List with roles and relevance
+- Note which quarter they appear in
 
-6. TERMS
-Define technical terms in order of appearance:
-- **Term** [First mentioned at HH:MM:SS]
-  - Definition: Clear explanation
-  #technical-term
+Technologies Discussed:
+- List with context and implications
+- Note which quarter they appear in
 
-7. TAGS
-#podcast #{platform_type} #[main-topic] #[secondary-topics]
+5. TECHNICAL TERMS
+- Term (HH:MM:SS): Definition and usage
+- Group by related concepts
 
-VALIDATION CHECKLIST:
-□ Read entire transcript first
-□ 3 impactful quotes (paradigm-shift, emotional, controversial)
-□ 10 claims (or justified fewer) in chronological order
-□ ALL references with temporal context
-□ Technical terms with first appearance time"""
+6. TAGS
+#mainThemes #subTopics #keyFigures #technologies
+
+CONFIRMATION
+"I confirm this analysis covers the entire podcast from 00:00:00 to {end}, including all four quarters"
+
+#podcast-analysis #transcripts #{platform_type}-podcast"""
 
     return prompt
+
+def format_timestamp(seconds: int) -> str:
+    """Format seconds into HH:MM:SS"""
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    seconds = seconds % 60
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+def format_duration(seconds: int) -> str:
+    """Format duration in human readable form"""
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    return f"{hours} hours, {minutes} minutes"
 
 def update_episode_markdown(
     episode_path: Path,
