@@ -3,10 +3,16 @@ import logging
 
 from ...config import Config
 from .prompt import generate_analysis_prompt
+from ..models.schemas import PodcastEntry
 
 logger = logging.getLogger(__name__)
 
 class MarkdownGenerator:
+    def _format_transcript_link(self, entry: PodcastEntry) -> str:
+        """Format transcript link in Obsidian style"""
+        transcript_file = f"{entry.episode_id}_transcript.md"
+        return f"[[{transcript_file}]]"
+
     def generate_episode_markdown(self, entry) -> Path:
         """Generate episode markdown file"""
         episode_path = Config.EPISODES_DIR / f"{entry.episode_id}.md"
@@ -33,7 +39,7 @@ class MarkdownGenerator:
             "",
             "## Links",
             f"- [Share URL]({entry.url})",
-            f"- [Transcript]({entry.transcripts_file})" if entry.transcripts_file else "- Transcript not available",
+            f"- Transcript: {self._format_transcript_link(entry)}",
             "",
             "## Interviewee",
             f"- **Name**: {entry.interviewee.name}",

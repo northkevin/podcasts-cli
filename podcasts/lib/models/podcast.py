@@ -8,9 +8,15 @@ from pydantic import BaseModel
 
 from ...config import Config
 from ..generators.id import IDGenerator
-from .schemas import Metadata, Interviewee
+from .schemas import PodcastEntry, Metadata, Interviewee
 
 logger = logging.getLogger(__name__)
+
+class DateTimeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
 
 class PodcastEntry(BaseModel):
     episode_id: str
@@ -21,9 +27,9 @@ class PodcastEntry(BaseModel):
     published_at: datetime
     podcast_name: str
     interviewee: Interviewee
+    webvtt_url: str
     status: str = "pending"
     episodes_file: str = ""
-    claims_file: str = ""
     transcripts_file: str = ""
     
     @property
@@ -41,7 +47,8 @@ class PodcastEntry(BaseModel):
             description=metadata.description,
             published_at=metadata.published_at,
             podcast_name=metadata.podcast_name,
-            interviewee=metadata.interviewee
+            interviewee=metadata.interviewee,
+            webvtt_url=metadata.webvtt_url
         )
 
 class PodcastList:
@@ -66,7 +73,7 @@ class PodcastList:
         try:
             data = [entry.dict() for entry in self.entries]
             with open(Config.PODCAST_LIST, 'w') as f:
-                json.dump(data, f, indent=2)
+                json.dump(data, f, indent=2, cls=DateTimeEncoder)
                 
         except Exception as e:
             logger.error(f"Failed to save podcast list: {e}")
@@ -74,7 +81,11 @@ class PodcastList:
     def add_entry(self, url: str, platform: str, metadata: Metadata, existing_id: Optional[str] = None) -> PodcastEntry:
         """Add new podcast entry"""
         # Generate or reuse episode ID
-        episode_id = existing_id or IDGenerator().generate_id(platform, metadata.published_at)
+        episode_id = existing_id or IDGenerator().generate_id(
+            platform=platform,
+            published_at=metadata.published_at,
+            interviewee_name=metadata.interviewee.name
+        )
         
         # Create entry from metadata
         entry = PodcastEntry.from_metadata(metadata, platform, episode_id)

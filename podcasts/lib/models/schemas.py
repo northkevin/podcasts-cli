@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List, Optional
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, AnyHttpUrl
 
 class Timestamp(BaseModel):
     start: float
@@ -29,6 +29,7 @@ class Metadata(BaseModel):
     podcast_name: str
     interviewee: Interviewee
     url: HttpUrl
+    webvtt_url: Optional[str] = None
 
 class TranscriptData(BaseModel):
     timestamps: List[Timestamp]
@@ -45,3 +46,37 @@ class TranscriptData(BaseModel):
             
         lines.append("\n```")
         return "\n".join(lines) 
+
+class PodcastEntry(BaseModel):
+    episode_id: str
+    url: str
+    platform: str
+    title: str
+    description: str
+    published_at: datetime
+    podcast_name: str
+    interviewee: Interviewee
+    webvtt_url: Optional[str] = None
+    status: str = "pending"
+    episodes_file: str = ""
+    transcripts_file: str = ""
+    
+    @property
+    def process_command(self) -> str:
+        return f"python -m podcasts process-podcast --episode_id {self.episode_id}" 
+    
+    @classmethod
+    def from_metadata(cls, metadata: Metadata, platform: str, episode_id: str) -> "PodcastEntry":
+        """Create entry from metadata"""
+        return cls(
+            episode_id=episode_id,
+            url=str(metadata.url),
+            platform=platform,
+            title=metadata.title,
+            description=metadata.description,
+            published_at=metadata.published_at,
+            podcast_name=metadata.podcast_name,
+            interviewee=metadata.interviewee,
+            webvtt_url=str(metadata.webvtt_url),
+            status="pending"
+        )

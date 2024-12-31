@@ -55,6 +55,7 @@ def cmd_add_podcast(url: str, platform: str) -> None:
         print(f"Title: {entry.title}")
         print(f"Podcast: {entry.podcast_name}")
         print(f"Interviewee: {entry.interviewee.name}")
+        print(f"WebVTT URL: {entry.webvtt_url}")
         print(f"\nRun next command:")
         print(f"{entry.process_command}")
         
@@ -127,7 +128,7 @@ def cmd_cleanup_episode(episode_id: str) -> None:
             return
         
         # Remove files if they exist
-        for file_path in [entry.episodes_file, entry.claims_file, entry.transcripts_file]:
+        for file_path in [entry.episodes_file, entry.transcripts_file]:
             if file_path:
                 path = Path(file_path)
                 if path.exists():

@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from datetime import datetime
 
 from ...config import Config
@@ -33,10 +34,15 @@ class IDGenerator:
         except Exception as e:
             logger.error(f"Failed to save ID cache: {e}")
     
-    def generate_id(self, platform: str, published_at: datetime) -> str:
-        """Generate unique episode ID"""
+    def generate_id(self, platform: str, published_at: datetime, interviewee_name: str) -> str:
+        """Generate unique episode ID with interviewee name"""
         date_str = published_at.strftime("%y_%m_%d")
-        base = f"{date_str}_{platform}"
+        
+        # Clean and format interviewee name
+        clean_name = self._clean_name(interviewee_name)
+        
+        # Create base ID with date, platform, and name
+        base = f"{date_str}_{platform}_{clean_name}"
         
         # Get current count for this base
         count = self.cache.get(base, 0) + 1
@@ -44,13 +50,24 @@ class IDGenerator:
         
         # Save updated cache
         self._save_cache()
-        
+
         # Format final ID
         return f"{base}_{count:02d}"
     
+    def _clean_name(self, name: str) -> str:
+        """Clean interviewee name for ID"""
+        # Remove special characters and spaces
+        clean = re.sub(r'[^a-zA-Z0-9]', '_', name.lower())
+        # Remove multiple underscores
+        clean = re.sub(r'_+', '_', clean)
+        # Take first two parts if name has multiple parts
+        parts = clean.split('_')[:2]
+        return '_'.join(parts)
+    
+    
     def reset_cache(self):
         """Reset ID cache"""
-        self.cache = {}
+        self.cache = {}        
         if self.cache_file.exists():
             self.cache_file.unlink()
         logger.info("ID cache reset")
