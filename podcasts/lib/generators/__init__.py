@@ -1,8 +1,9 @@
-from .id import PodcastID, IDGenerator
+from .id import IDGenerator
 from .markdown import MarkdownGenerator
+from .prompt import generate_analysis_prompt
 
 __all__ = [
-    'PodcastID',
     'IDGenerator',
-    'MarkdownGenerator'
+    'MarkdownGenerator',
+    'generate_analysis_prompt'
 ]

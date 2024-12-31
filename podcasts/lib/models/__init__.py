@@ -1,10 +1,12 @@
-from .podcast import PodcastList, PodcastEntry, Interviewee, save_state, get_state
+from .podcast import PodcastEntry, PodcastList, save_state
+from .schemas import Metadata, TranscriptData, Interviewee
 
 __all__ = [
+    'Metadata',
+    'TranscriptData',
+    'Interviewee',
     'PodcastList',
     'PodcastEntry',
-    'Interviewee',
-    'save_state',
-    'get_state'
+    'save_state'
 ]
 

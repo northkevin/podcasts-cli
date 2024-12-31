@@ -4,7 +4,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
 build/
 develop-eggs/
 dist/
@@ -19,11 +18,18 @@ var/
 .installed.cfg
 *.egg
 
+# Environment
+.env
+.venv
+env/
+venv/
+ENV/
+
 # IDE
-.vscode/
 .idea/
+.vscode/
+*.swp
+*.swo
 
 # Project specific
 podcasts/dist/
-config.json
-.env

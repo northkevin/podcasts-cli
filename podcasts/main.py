@@ -6,7 +6,7 @@ import logging
 from typing import Optional
 
 from .config import Config
-from lib.commands import cmd_add_podcast, cmd_process_podcast, cmd_cleanup_episode
+from .lib.commands import cmd_add_podcast, cmd_process_podcast, cmd_cleanup_episode
 
 logger = logging.getLogger(__name__)
 
