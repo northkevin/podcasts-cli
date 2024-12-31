@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List, Optional
-from pydantic import BaseModel, HttpUrl, AnyHttpUrl
+from pydantic import BaseModel, HttpUrl, AnyHttpUrl, Field
 
 class Timestamp(BaseModel):
     start: float
@@ -29,7 +29,7 @@ class Metadata(BaseModel):
     podcast_name: str
     interviewee: Interviewee
     url: HttpUrl
-    webvtt_url: Optional[str] = None
+    webvtt_url: Optional[str] = ""
 
 class TranscriptData(BaseModel):
     timestamps: List[Timestamp]
@@ -56,14 +56,21 @@ class PodcastEntry(BaseModel):
     published_at: datetime
     podcast_name: str
     interviewee: Interviewee
-    webvtt_url: Optional[str] = None
+    webvtt_url: Optional[str] = ""
     status: str = "pending"
     episodes_file: str = ""
     transcripts_file: str = ""
     
+    model_config = {
+        "arbitrary_types_allowed": True,
+        "json_encoders": {
+            datetime: lambda v: v.isoformat()
+        }
+    }
+    
     @property
     def process_command(self) -> str:
-        return f"python -m podcasts process-podcast --episode_id {self.episode_id}" 
+        return f"python -m podcasts process-podcast --episode_id {self.episode_id}"
     
     @classmethod
     def from_metadata(cls, metadata: Metadata, platform: str, episode_id: str) -> "PodcastEntry":
@@ -77,6 +84,6 @@ class PodcastEntry(BaseModel):
             published_at=metadata.published_at,
             podcast_name=metadata.podcast_name,
             interviewee=metadata.interviewee,
-            webvtt_url=str(metadata.webvtt_url),
+            webvtt_url=metadata.webvtt_url or "",
             status="pending"
         )

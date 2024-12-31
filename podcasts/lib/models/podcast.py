@@ -62,21 +62,23 @@ class PodcastList:
             if Config.PODCAST_LIST.exists():
                 with open(Config.PODCAST_LIST, 'r') as f:
                     data = json.load(f)
-                    self.entries = [PodcastEntry.parse_obj(entry) for entry in data]
-                    
+                    self.entries = [PodcastEntry.model_validate(entry) for entry in data]
         except Exception as e:
-            logger.error(f"Failed to load podcast list: {e}")
-            self.entries = []
+            logger.warning(f"Failed to load podcast list: {e}")
     
     def _save(self):
         """Save podcast list to file"""
         try:
-            data = [entry.dict() for entry in self.entries]
             with open(Config.PODCAST_LIST, 'w') as f:
-                json.dump(data, f, indent=2, cls=DateTimeEncoder)
-                
+                json.dump(
+                    [entry.model_dump() for entry in self.entries],
+                    f,
+                    indent=2,
+                    cls=DateTimeEncoder
+                )
         except Exception as e:
             logger.error(f"Failed to save podcast list: {e}")
+            raise
     
     def add_entry(self, url: str, platform: str, metadata: Metadata, existing_id: Optional[str] = None) -> PodcastEntry:
         """Add new podcast entry"""
@@ -89,6 +91,10 @@ class PodcastList:
         
         # Create entry from metadata
         entry = PodcastEntry.from_metadata(metadata, platform, episode_id)
+        
+        # Set file paths using Config methods
+        entry.episodes_file = str(Config.get_episodes_dir() / f"{episode_id}.md")
+        entry.transcripts_file = str(Config.get_transcript_path(episode_id))
         
         self.entries.append(entry)
         self._save()
@@ -107,9 +113,9 @@ class PodcastList:
         entry = self.get_entry(episode_id)
         if entry:
             # Update fields and validate with Pydantic
-            updated_data = entry.dict()
+            updated_data = entry.model_dump()
             updated_data.update(kwargs)
-            self.entries[self.entries.index(entry)] = PodcastEntry.parse_obj(updated_data)
+            self.entries[self.entries.index(entry)] = PodcastEntry.model_validate(updated_data)
             self._save()
 
 def save_state(episode_id: str, status: str = "processing", error: Optional[str] = None):

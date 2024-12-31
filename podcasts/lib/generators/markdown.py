@@ -15,7 +15,7 @@ class MarkdownGenerator:
 
     def generate_episode_markdown(self, entry) -> Path:
         """Generate episode markdown file"""
-        episode_path = Config.EPISODES_DIR / f"{entry.episode_id}.md"
+        episode_path = Config.get_episodes_dir() / f"{entry.episode_id}.md"
         
         # Generate prompt
         prompt = generate_analysis_prompt(

@@ -89,8 +89,10 @@ def cmd_process_podcast(episode_id: str) -> None:
                 transcript_data = fetcher.get_transcript(entry.url)
                 with open(transcript_path, 'w', encoding='utf-8') as f:
                     f.write(transcript_data.format())
-            else:  # vimeo
+            elif entry.platform == "vimeo" and entry.webvtt_url:
                 transcript_path = process_vimeo_transcript(entry)
+            else:
+                raise ValueError(f"Unsupported platform or missing webvtt_url: {entry.platform}")
             
             # Update transcript file path
             podcast_list.update_entry(episode_id, transcripts_file=str(transcript_path))
@@ -106,14 +108,11 @@ def cmd_process_podcast(episode_id: str) -> None:
             print(f"\nFiles created:")
             print(f"1. Episode:    {episode_file}")
             print(f"2. Transcript: {transcript_path}")
-            print(f"\nPodcast data stored in: {Config.PODCAST_LIST}")
-            print(f"Episode ID: {entry.episode_id}")
             
         except Exception as e:
             save_state(episode_id, status="error", error=str(e))
-            podcast_list.update_entry(episode_id, status="error")
             raise
-        
+            
     except Exception as e:
         logger.error(f"Error processing podcast: {e}")
         raise

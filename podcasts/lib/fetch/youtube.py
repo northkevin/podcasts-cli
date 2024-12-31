@@ -47,7 +47,8 @@ class YouTubeFetcher:
                     name=self._extract_interviewee_name(snippet),
                     profession=self._extract_profession(snippet),
                     organization=self._extract_organization(snippet)
-                )
+                ),
+                webvtt_url=""  # Return empty string instead of None
             )
             
         except HttpError as e:
