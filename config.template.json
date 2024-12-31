@@ -1,0 +1,6 @@
+{
+    "output_dir": "podcasts/dist",
+    "episodes_dir": "podcasts/dist/episodes",
+    "transcripts_dir": "podcasts/dist/transcripts",
+    "podcast_list": "podcasts/dist/podcast_list.json"
+}
