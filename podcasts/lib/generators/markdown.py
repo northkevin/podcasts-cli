@@ -13,9 +13,14 @@ class MarkdownGenerator:
         transcript_file = f"{entry.episode_id}_transcript.md"
         return f"[[{transcript_file}]]"
 
-    def generate_episode_markdown(self, entry) -> Path:
+    def generate_episode_markdown(self, entry: PodcastEntry) -> Path:
         """Generate episode markdown file"""
         episode_path = Config.get_episodes_dir() / f"{entry.episode_id}.md"
+        
+        # Format duration
+        hours = entry.duration_seconds // 3600
+        minutes = (entry.duration_seconds % 3600) // 60
+        duration_str = f"{hours}h {minutes}m"
         
         # Generate prompt
         prompt = generate_analysis_prompt(
@@ -25,7 +30,8 @@ class MarkdownGenerator:
             share_url=entry.url,
             transcript_filename=entry.transcripts_file,
             platform_type=entry.platform,
-            interviewee=entry.interviewee
+            interviewee=entry.interviewee,
+            duration_seconds=entry.duration_seconds
         )
         
         # Format episode content
@@ -36,6 +42,7 @@ class MarkdownGenerator:
             f"- **Title**: {entry.title}",
             f"- **Podcast**: {entry.podcast_name}",
             f"- **Published**: {entry.published_at.strftime('%Y-%m-%d')}",
+            f"- **Duration**: {duration_str}",
             "",
             "## Links",
             f"- [Share URL]({entry.url})",

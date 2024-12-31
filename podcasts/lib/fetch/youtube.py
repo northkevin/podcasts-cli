@@ -7,6 +7,7 @@ from datetime import datetime
 from googleapiclient.discovery import build
 from youtube_transcript_api import YouTubeTranscriptApi
 from googleapiclient.errors import HttpError
+from isodate import parse_duration
 
 from ...config import Config
 from ..models.schemas import Metadata, Interviewee, TranscriptData
@@ -26,8 +27,9 @@ class YouTubeFetcher:
             raise ValueError(f"Could not extract video ID from URL: {url}")
         
         try:
+            # Request both snippet and contentDetails for duration
             response = self.youtube.videos().list(
-                part='snippet,contentDetails',
+                part='snippet,contentDetails',  # Add contentDetails for duration
                 id=video_id
             ).execute()
             
@@ -36,6 +38,10 @@ class YouTubeFetcher:
             
             video_data = response['items'][0]
             snippet = video_data['snippet']
+            
+            # Parse duration from ISO 8601 format
+            duration_iso = video_data['contentDetails']['duration']
+            duration_seconds = int(parse_duration(duration_iso).total_seconds())
             
             return Metadata(
                 title=snippet['title'],
@@ -48,7 +54,8 @@ class YouTubeFetcher:
                     profession=self._extract_profession(snippet),
                     organization=self._extract_organization(snippet)
                 ),
-                webvtt_url=""  # Return empty string instead of None
+                webvtt_url="",
+                duration_seconds=duration_seconds  # Add duration to metadata
             )
             
         except HttpError as e:

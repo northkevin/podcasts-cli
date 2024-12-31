@@ -30,6 +30,7 @@ class Metadata(BaseModel):
     interviewee: Interviewee
     url: HttpUrl
     webvtt_url: Optional[str] = ""
+    duration_seconds: int
 
 class TranscriptData(BaseModel):
     timestamps: List[Timestamp]
@@ -57,6 +58,7 @@ class PodcastEntry(BaseModel):
     podcast_name: str
     interviewee: Interviewee
     webvtt_url: Optional[str] = ""
+    duration_seconds: int
     status: str = "pending"
     episodes_file: str = ""
     transcripts_file: str = ""
@@ -85,5 +87,6 @@ class PodcastEntry(BaseModel):
             podcast_name=metadata.podcast_name,
             interviewee=metadata.interviewee,
             webvtt_url=metadata.webvtt_url or "",
+            duration_seconds=metadata.duration_seconds,
             status="pending"
         )

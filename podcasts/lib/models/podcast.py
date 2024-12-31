@@ -2,7 +2,7 @@ import json
 import logging
 from pathlib import Path
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from pydantic import BaseModel
 
@@ -28,6 +28,7 @@ class PodcastEntry(BaseModel):
     podcast_name: str
     interviewee: Interviewee
     webvtt_url: str
+    duration_seconds: int
     status: str = "pending"
     episodes_file: str = ""
     transcripts_file: str = ""
@@ -48,7 +49,8 @@ class PodcastEntry(BaseModel):
             published_at=metadata.published_at,
             podcast_name=metadata.podcast_name,
             interviewee=metadata.interviewee,
-            webvtt_url=metadata.webvtt_url
+            webvtt_url=metadata.webvtt_url,
+            duration_seconds=metadata.duration_seconds
         )
 
 class PodcastList:
@@ -70,12 +72,8 @@ class PodcastList:
         """Save podcast list to file"""
         try:
             with open(Config.PODCAST_LIST, 'w') as f:
-                json.dump(
-                    [entry.model_dump() for entry in self.entries],
-                    f,
-                    indent=2,
-                    cls=DateTimeEncoder
-                )
+                json_data = [entry.model_dump() for entry in self.entries]
+                json.dump(json_data, f, indent=2, default=str)
         except Exception as e:
             logger.error(f"Failed to save podcast list: {e}")
             raise

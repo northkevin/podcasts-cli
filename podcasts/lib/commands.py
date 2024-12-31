@@ -10,6 +10,7 @@ from .fetch.youtube import YouTubeFetcher
 from .fetch.vimeo import get_vimeo_data_headless, create_episode_metadata, process_vimeo_transcript
 from .generators.markdown import MarkdownGenerator
 from .generators.id import IDGenerator
+from .generators.prompt import generate_analysis_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ def cmd_add_podcast(url: str, platform: str) -> None:
             print("\nPodcast already exists:")
             print(f"Episode ID: {existing_entry.episode_id}")
             print(f"Title: {existing_entry.title}")
+            print(f"Duration: {existing_entry.duration_seconds // 3600}h {(existing_entry.duration_seconds % 3600) // 60}m")
             print(f"Podcast: {existing_entry.podcast_name}")
             print(f"Interviewee: {existing_entry.interviewee.name}")
             print(f"Status: {existing_entry.status}")
@@ -54,6 +56,7 @@ def cmd_add_podcast(url: str, platform: str) -> None:
         print("\nPodcast added successfully!")
         print(f"Episode ID: {entry.episode_id}")
         print(f"Title: {entry.title}")
+        print(f"Duration: {entry.duration_seconds // 3600}h {(entry.duration_seconds % 3600) // 60}m")
         print(f"Podcast: {entry.podcast_name}")
         print(f"Interviewee: {entry.interviewee.name}")
         print(f"WebVTT URL: {entry.webvtt_url}")
@@ -65,15 +68,28 @@ def cmd_add_podcast(url: str, platform: str) -> None:
         raise
 
 def cmd_process_podcast(episode_id: str) -> None:
-    """Process podcast content"""
+    """Process a podcast episode"""
     try:
+        # Get podcast entry
         podcast_list = PodcastList()
         markdown_gen = MarkdownGenerator()
         
         entry = podcast_list.get_entry(episode_id)
         if not entry:
-            raise ValueError(f"Episode {episode_id} not found")
-        
+            raise ValueError(f"No podcast found with ID: {episode_id}")
+
+        # Generate analysis prompt
+        prompt = generate_analysis_prompt(
+            title=entry.title,
+            podcast_name=entry.podcast_name,
+            episode_id=entry.episode_id,
+            share_url=entry.url,
+            transcript_filename=entry.transcripts_file,
+            platform_type=entry.platform,
+            interviewee=entry.interviewee,
+            duration_seconds=entry.duration_seconds
+        )
+
         # Ensure directories exist
         Config.ensure_dirs()
         

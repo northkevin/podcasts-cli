@@ -120,3 +120,20 @@ podcasts --debug add-podcast --platform youtube --url "https://www.youtube.com/w
 - Python 3.9+
 - YouTube API key (for YouTube videos)
 - Selenium WebDriver (for Vimeo videos)
+
+## Podcast Entry Fields
+
+Each podcast entry contains:
+
+- `episode_id`: Unique identifier for the episode
+- `url`: URL to the podcast episode
+- `platform`: Platform where the podcast is hosted (e.g., "youtube", "vimeo")
+- `title`: Episode title
+- `description`: Episode description
+- `published_at`: Publication date
+- `podcast_name`: Name of the podcast series
+- `interviewee`: Information about the guest
+- `duration_seconds`: Length of the podcast in seconds
+- `status`: Processing status
+- `episodes_file`: Path to episode markdown file
+- `transcripts_file`: Path to transcript file

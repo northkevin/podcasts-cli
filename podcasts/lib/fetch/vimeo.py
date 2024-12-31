@@ -114,98 +114,28 @@ def get_vimeo_data_headless(vimeo_url: str) -> Dict[str, Any]:
         logger.debug("Quitting headless browser")
         driver.quit()
 
-def create_episode_metadata(video_id: str, data: Dict[str, Any]) -> Metadata:
-    """Create episode metadata from Vimeo data"""
-    logger.debug("Starting metadata creation for video_id: %s", video_id)
+def create_episode_metadata(video_id: str, data: Dict) -> Metadata:
+    """Create metadata from Vimeo data"""
+    video = data.get("playerConfig", {}).get("video", {})
     
-    # Extract domain from the input URL
-    original_url = data.get("url", "")
-    url_parts = urlparse(original_url)
-    base_domain = f"{url_parts.scheme}://{url_parts.netloc}"
-    logger.debug(f"Base domain: {base_domain}")
-
-    # Get video data from playerConfig
-    video_data = data.get("playerConfig", {}).get("video", {})
-    if not video_data:
-        logger.error("No video data found in playerConfig")
-        logger.debug("playerConfig data: %s", json.dumps(data.get("playerConfig", {}), indent=2))
-        raise ValueError("No video data found in Vimeo response")
+    # Extract duration in seconds from Vimeo data
+    duration_raw = video.get("duration", 0)  # Vimeo provides duration in seconds
+    duration_seconds = int(duration_raw)
     
-    # Get transcript URL from text_tracks
-    webvtt_url = None
-    request_data = data.get("playerConfig", {}).get("request", {})
-    logger.debug("Request data: %s", json.dumps(request_data, indent=2))
-    
-    if "text_tracks" in request_data and request_data["text_tracks"]:
-        track = request_data["text_tracks"][0]
-        track_url = track.get("url", "")
-        logger.debug(f"Raw track URL: {track_url}")
-        
-        if track_url:
-            # Fix URL formatting with proper domain
-            track_url = track_url.lstrip('/')  # Remove leading slashes
-            if not track_url.startswith(('http://', 'https://')):
-                track_url = f"{base_domain}/{track_url}"  # Use original domain
-            webvtt_url = str(track_url)  # Convert to string to ensure it's serializable
-            logger.debug(f"Processed webvtt_url: {webvtt_url}")
-    
-    # Get LD+JSON data
-    ld_json_data = next((item for item in data.get("ld_json", []) 
-                        if item.get("@type") == "VideoObject"), {})
-    
-    # Extract title and try to parse interviewee info
-    title = ld_json_data.get("name") or video_data.get('title', '')
-    
-    # Try to extract interviewee name from title
-    interviewee_name = "<MANUAL>"
-    if "PODCAST |" in title:
-        # Format: "PODCAST | JACK KRUSE"
-        parts = title.split("|")
-        if len(parts) > 1:
-            interviewee_name = parts[1].strip()
-    elif "with" in title.lower():
-        # Format: "Podcast with Jack Kruse"
-        parts = title.lower().split("with")
-        if len(parts) > 1:
-            interviewee_name = parts[1].strip().title()
-    
-    # Get owner info for potential organization
-    owner_data = video_data.get("owner", {})
-    owner_name = owner_data.get("name", "")
-    
-    # Get upload date
-    upload_date = (
-        ld_json_data.get("uploadDate", "").split("T")[0] or
-        video_data.get("upload_date") or
-        datetime.now().strftime("%Y-%m-%d")
-    )
-
-    # Convert to datetime - handle both string and timestamp formats
-    if isinstance(upload_date, str):
-        published_at = datetime.fromisoformat(upload_date)
-    else:
-        # Assume it's a timestamp
-        published_at = datetime.fromtimestamp(upload_date)
-    
-    metadata = Metadata(
-        title=title,
-        description=ld_json_data.get("description") or video_data.get('description', ''),
-        published_at=published_at,
-        podcast_name=owner_name,
-        url=original_url,
-        webvtt_url=webvtt_url,
+    return Metadata(
+        title=video.get("title", ""),
+        description=video.get("description", ""),
+        published_at=datetime.now(),  # Vimeo doesn't provide this easily
+        podcast_name=extract_podcast_name(video),
+        url=f"https://vimeo.com/{video_id}",
         interviewee=Interviewee(
-            name=interviewee_name,
-            profession=_extract_profession(ld_json_data.get("description") or video_data.get('description', '')),
-            organization=_extract_organization(ld_json_data.get("description") or video_data.get('description', ''))
-        )
+            name=extract_interviewee_name(video),
+            profession=extract_profession(video),
+            organization=extract_organization(video)
+        ),
+        webvtt_url=extract_webvtt_url(data),
+        duration_seconds=duration_seconds  # Add duration
     )
-    
-    # Debug the final metadata
-    logger.debug(f"Final metadata webvtt_url: {metadata.webvtt_url}")
-    logger.debug(f"Full metadata: {metadata.model_dump_json(indent=2)}")
-    
-    return metadata
 
 def process_vimeo_transcript(entry: PodcastEntry) -> Path:
     """Process Vimeo transcript using saved webvtt URL"""
