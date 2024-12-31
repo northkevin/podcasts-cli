@@ -10,8 +10,17 @@ setup(
         "youtube-transcript-api>=0.6.0",
         "selenium>=4.0.0",
         "beautifulsoup4>=4.9.0",
-        "requests>=2.25.0"
+        "requests>=2.25.0",
+        "python-dotenv>=0.19.0"
     ],
+    extras_require={
+        "dev": [
+            "pytest>=7.0.0",
+            "black>=22.0.0",
+            "flake8>=4.0.0",
+            "isort>=5.0.0"
+        ]
+    },
     entry_points={
         'console_scripts': [
             'podcasts=podcasts.main:main',

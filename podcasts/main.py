@@ -6,7 +6,7 @@ import logging
 from typing import Optional
 
 from .config import Config
-from .lib.commands import cmd_add_podcast, cmd_process_podcast, cmd_cleanup_episode
+from .lib.commands import cmd_add_podcast, cmd_process_podcast, cmd_cleanup_episode, cmd_configure
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,15 @@ def main():
     cleanup_parser = subparsers.add_parser("cleanup-podcast")
     cleanup_parser.add_argument("--episode_id", required=True)
     
+    # Config command
+    config_parser = subparsers.add_parser("config")
+    config_parser.add_argument("--show", action="store_true", help="Show current configuration")
+    config_parser.add_argument("--obsidian", action="store_true", help="Configure Obsidian integration")
+    config_parser.add_argument("--vault-path", help="Path to Obsidian vault")
+    config_parser.add_argument("--episodes-dir", help="Episodes directory within vault")
+    config_parser.add_argument("--transcripts-dir", help="Transcripts directory within vault")
+    config_parser.add_argument("--reset", action="store_true", help="Reset to default configuration")
+    
     args = parser.parse_args()
     
     # Setup logging
@@ -54,6 +63,8 @@ def main():
             cmd_process_podcast(args.episode_id)
         elif args.command == "cleanup-podcast":
             cmd_cleanup_episode(args.episode_id)
+        elif args.command == "config":
+            cmd_configure(args)
         else:
             parser.print_help()
             

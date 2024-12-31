@@ -1,6 +1,7 @@
 import os
 import logging
 from pathlib import Path
+import json
 
 from ..config import Config
 from .models.podcast import PodcastList, save_state
@@ -147,4 +148,62 @@ def cmd_cleanup_episode(episode_id: str) -> None:
         
     except Exception as e:
         logger.error(f"Error during cleanup: {e}")
+        raise 
+
+def cmd_configure(args):
+    """Configure CLI settings"""
+    try:
+        if args.show:
+            config = Config.load_config()
+            print("\nCurrent Configuration:")
+            print("---------------------")
+            print(f"Using Obsidian: {config.get('use_obsidian', False)}")
+            if config.get('use_obsidian'):
+                print(f"Vault Path: {config.get('obsidian_vault_path', 'Not set')}")
+                print(f"Episodes Directory: {config.get('episodes_dir', 'Not set')}")
+                print(f"Transcripts Directory: {config.get('transcripts_dir', 'Not set')}")
+            print("\nCurrent Paths:")
+            print(f"Episodes: {Config.get_episodes_dir()}")
+            print(f"Transcripts: {Config.get_transcripts_dir()}")
+            return
+
+        if args.reset:
+            if Config.CONFIG_FILE.exists():
+                Config.CONFIG_FILE.unlink()
+            print("Configuration reset to defaults")
+            return
+
+        config = Config.load_config()
+        
+        if args.obsidian:
+            config["use_obsidian"] = True
+            
+            if args.vault_path:
+                config["obsidian_vault_path"] = os.path.expanduser(args.vault_path)
+            else:
+                vault_path = input("Enter path to your Obsidian vault: ")
+                config["obsidian_vault_path"] = os.path.expanduser(vault_path)
+            
+            if args.episodes_dir:
+                config["episodes_dir"] = args.episodes_dir
+            else:
+                episodes_dir = input("Enter episodes directory name [Podcast Episodes]: ") or "Podcast Episodes"
+                config["episodes_dir"] = episodes_dir
+            
+            if args.transcripts_dir:
+                config["transcripts_dir"] = args.transcripts_dir
+            else:
+                transcripts_dir = input("Enter transcripts directory name [Podcast Transcripts]: ") or "Podcast Transcripts"
+                config["transcripts_dir"] = transcripts_dir
+
+        # Save configuration
+        with open(Config.CONFIG_FILE, 'w') as f:
+            json.dump(config, f, indent=2)
+            
+        print("\nConfiguration updated successfully!")
+        print(f"Episodes directory: {Config.get_episodes_dir()}")
+        print(f"Transcripts directory: {Config.get_transcripts_dir()}")
+        
+    except Exception as e:
+        logger.error(f"Failed to update configuration: {e}")
         raise 

@@ -1,6 +1,6 @@
 {
-    "output_dir": "podcasts/dist",
-    "episodes_dir": "podcasts/dist/episodes",
-    "transcripts_dir": "podcasts/dist/transcripts",
-    "podcast_list": "podcasts/dist/podcast_list.json"
+    "use_obsidian": false,
+    "obsidian_vault_path": "~/Documents/Obsidian/YourVault",
+    "episodes_dir": "Podcast Episodes",
+    "transcripts_dir": "Podcast Transcripts"
 }
