@@ -12,3 +12,4 @@ black>=22.0.0
 flake8>=4.0.0
 isort>=5.0.0
 isodate>=0.6.1
+pyperclip>=1.8.0

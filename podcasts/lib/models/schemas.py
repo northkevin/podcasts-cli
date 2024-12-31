@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, HttpUrl, AnyHttpUrl, Field
 
 class Timestamp(BaseModel):
@@ -32,11 +32,26 @@ class Metadata(BaseModel):
     webvtt_url: Optional[str] = ""
     duration_seconds: int
 
+
+
+class TranscriptStats(BaseModel):
+    words: int
+    chars: int
+
+    @classmethod
+    def from_text(cls, text: str) -> "TranscriptStats":
+        """Create stats from transcript text"""
+        return cls(
+            words=len(text.split()),
+            chars=len(text)
+        )
+
 class TranscriptData(BaseModel):
-    timestamps: List[Timestamp]
+    entries: List[Dict[str, Any]]
+    stats: Optional[TranscriptStats] = None
     
     def format(self) -> str:
-        """Format transcript in our standard format"""
+        """Format transcript entries into markdown"""
         lines = ["# Transcript\n", "```timestamp-transcript"]
         
         for ts in self.timestamps:

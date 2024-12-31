@@ -19,19 +19,16 @@ def generate_analysis_prompt(
 ) -> str:
     """Generate analysis prompt for podcast transcript"""
     
-    # Calculate quarter marks for the podcast
-    quarter_duration = duration_seconds // 4
-    q1 = format_timestamp(quarter_duration)
-    q2 = format_timestamp(quarter_duration * 2)
-    q3 = format_timestamp(quarter_duration * 3)
+    # Calculate duration info
     end = format_timestamp(duration_seconds)
+    duration_str = format_duration(duration_seconds)
     
     prompt = f"""ANALYZE PODCAST TRANSCRIPT: {title}
 
 BEFORE STARTING:
-1. Read the entire transcript ({transcript_filename})
-2. Total Duration: {format_duration(duration_seconds)} (00:00:00 to {end})
-3. Confirm: "I have read the complete transcript from start to finish"
+1. Read the entire transcript ({transcript_filename}) from start to finish.
+2. The total duration is {duration_str} (00:00:00 to {end}).
+3. Confirm in your opening statement: "I have read the complete transcript from start to finish."
 
 METADATA
 - Title: {title}
@@ -42,64 +39,50 @@ METADATA
 
 ANALYSIS STRUCTURE:
 
-1. KEY QUOTES (3 total, from different quarters)
-Select one quote from each time range:
-- First Quarter (00:00:00 - {q1})
-- Second Quarter ({q1} - {q2}) 
-- Third Quarter ({q2} - {q3})
-- Fourth Quarter ({q3} - {end})
+1. KEY QUOTES (4 total)
+   - **One quote** from each quarter of the transcript, but do NOT label them as quarters
+   - Simply present 4 quotes, each with a timestamp
+   - Format in Markdown block-quote style:
+     ```
+     > [!quote]
+     > "Quote text" – Speaker (HH:MM:SS)
+     > #relevantTags
+     ```
 
-Format each:
-> [!quote]
-> "Quote text" – Speaker (HH:MM:SS)
-> ⎯tags #relevantTags
+2. OVERVIEW (50-75 words maximum)
+   - A succinct summary focusing on main topic(s), unique perspective(s), and why it matters.
 
-2. OVERVIEW
-Brief summary of core topic, unique perspective, and implications.
-
-3. CHRONOLOGICAL ANALYSIS
-First Quarter (00:00:00 - {q1}):
-- Key claims and points made
-- Include timestamps and tags
-- Note significant references
-
-Second Quarter ({q1} - {q2}):
-- Key claims and points made
-- Include timestamps and tags
-- Note significant references
-
-Third Quarter ({q2} - {q3}):
-- Key claims and points made
-- Include timestamps and tags
-- Note significant references
-
-Fourth Quarter ({q3} - {end}):
-- Key claims and points made
-- Include timestamps and tags
-- Note significant references
+3. CLAIMS (16-20 total)
+   - Extract significant claims from across the entire episode
+   - Each claim is in **one line**:
+     ```
+     Claim text (HH:MM:SS) #relevantTags
+     ```
 
 4. REFERENCES
-Books & Publications:
-- List with context and timestamps
-- Note which quarter they appear in
-
-People Mentioned:
-- List with roles and relevance
-- Note which quarter they appear in
-
-Technologies Discussed:
-- List with context and implications
-- Note which quarter they appear in
+   - **People**: Name, timestamp, why they were mentioned
+   - **Books**: Title, timestamp, context/reason for mention
+   - **Technologies**: Name, timestamp, function or relevance
 
 5. TECHNICAL TERMS
-- Term (HH:MM:SS): Definition and usage
-- Group by related concepts
+   - **Term (HH:MM:SS)**: One-liner definition
+   - Group related terms if appropriate
 
-6. TAGS
-#mainThemes #subTopics #keyFigures #technologies
+6. DEEP DIVE (if applicable)
+   - **3–5 paragraphs** on the most significant or polarizing aspect of the conversation
+   - If the episode is not especially deep or polarizing, you can omit this section
+
+7. THEMES
+   - Main themes and sub-themes
+   - Use #mainThemes, #subTopics, etc., to keep the structure consistent
+
+8. TAGS
+   - Predefined: `#mainThemes #subTopics #keyFigures #technologies`
+   - Add any others as relevant (e.g., #health #quantumMechanics #conspiracy)
 
 CONFIRMATION
-"I confirm this analysis covers the entire podcast from 00:00:00 to {end}, including all four quarters"
+- [ ] "I confirm this analysis covers the entire podcast from 00:00:00 to {end}."
+- [ ] Verify coverage of any named references or tangential mentions.
 
 #podcast-analysis #transcripts #{platform_type}-podcast"""
 

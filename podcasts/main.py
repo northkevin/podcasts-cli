@@ -6,7 +6,7 @@ import logging
 from typing import Optional
 
 from .config import Config
-from .lib.commands import cmd_add_podcast, cmd_process_podcast, cmd_cleanup_episode, cmd_configure
+from .lib.commands import cmd_add_podcast, cmd_process_podcast, cmd_cleanup_episode, cmd_configure, cmd_test_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +47,13 @@ def main():
     config_parser.add_argument("--transcripts-dir", help="Transcripts directory within vault")
     config_parser.add_argument("--reset", action="store_true", help="Reset to default configuration")
     
+    # Add test command
+    parser.add_argument(
+        '--test-prompt',
+        action='store_true',
+        help='Generate a test prompt with sample metadata'
+    )
+    
     args = parser.parse_args()
     
     # Setup logging
@@ -57,7 +64,9 @@ def main():
     
     # Execute command
     try:
-        if args.command == "add-podcast":
+        if args.test_prompt:
+            cmd_test_prompt()
+        elif args.command == "add-podcast":
             cmd_add_podcast(args.url, args.platform)
         elif args.command == "process-podcast":
             cmd_process_podcast(args.episode_id)

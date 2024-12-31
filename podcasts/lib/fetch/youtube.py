@@ -10,7 +10,7 @@ from googleapiclient.errors import HttpError
 from isodate import parse_duration
 
 from ...config import Config
-from ..models.schemas import Metadata, Interviewee, TranscriptData
+from ..models.schemas import Metadata, Interviewee, TranscriptData, TranscriptStats
 from ..processors.transcript import TranscriptService
 
 logger = logging.getLogger(__name__)
@@ -127,25 +127,21 @@ class YouTubeFetcher:
         return ""
     
     def get_transcript(self, url: str) -> TranscriptData:
-        """Get transcript from YouTube video"""
-        logger.debug(f"Fetching transcript for URL: {url}")
-        
-        video_id = None
-        for pattern in [
-            r'(?:youtube\.com/watch\?v=|youtu\.be/)([^&\n?#]+)',
-            r'youtube\.com/embed/([^&\n?#]+)',
-            r'youtube\.com/v/([^&\n?#]+)',
-        ]:
-            if match := re.search(pattern, url):
-                video_id = match.group(1)
-                break
-            
+        """Get transcript data from YouTube"""
+        video_id = self._extract_video_id(url)
         if not video_id:
             raise ValueError(f"Could not extract video ID from URL: {url}")
         
         try:
             transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
-            return self.transcript_service.process_transcript('youtube', transcript_list)
+            transcript_data = TranscriptData(entries=transcript_list)
+            
+            # Calculate stats from formatted text
+            formatted_text = transcript_data.format()
+            stats = TranscriptStats.from_text(formatted_text)
+            transcript_data.stats = stats  # Add stats to transcript data
+            
+            return transcript_data
             
         except Exception as e:
             logger.error(f"Error fetching transcript: {str(e)}")
