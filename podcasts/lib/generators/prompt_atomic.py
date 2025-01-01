@@ -15,88 +15,37 @@ def generate_atomic_prompts(
     min_cards = int(hours * cards_per_hour)
     
     # Generate timestamped URL format
-    video_id = metadata.url.split("v=")[-1]
+    video_id = str(metadata.url).split("v=")[-1]
     url_base = f"https://youtube.com/watch?v={video_id}&t="
     
-    # Format preset tags if available
-    preset_tags_str = ""
-    if metadata.preset_tags:
-        preset_tags_str = "\nSuggested tags:\n" + "\n".join(
-            f"- #{tag}" for tag in metadata.preset_tags
-        )
+    # Add thumbnail if available
+    thumbnail_section = ""
+    if metadata.youtube_metadata and metadata.youtube_metadata.thumbnail_url:
+        thumbnail_section = f"![[{metadata.youtube_metadata.thumbnail_url}]]\n\n"
     
-    # Add note about config status
-    config_status = ""
-    if metadata.youtube_metadata and metadata.youtube_metadata.channel_id in fetcher.configs:
-        config_status = "\n✓ Using configured podcast metadata"
-    else:
-        config_status = "\n⚠️ Using default metadata - configure in podcast_configs.json for better results"
+    # Build the prompt
+    prompt = f"""# {metadata.title}
+
+{thumbnail_section}## Metadata
+- **Guest**: {metadata.guest.name if metadata.guest else 'Unknown'}
+- **Host**: {metadata.host.name if metadata.host else 'Unknown'}
+- **Date**: {metadata.published_at.strftime('%Y-%m-%d')}
+- **URL**: {metadata.url}
+- **Duration**: {end}
+
+## Description
+{metadata.description}
+
+## Notes
+- Target: {min_cards} atomic notes minimum
+- Focus on key concepts, insights, and unique perspectives
+- Include relevant timestamps using format: {url_base}{{seconds}}
+- Tag speakers appropriately
+"""
     
-    prompt = f"""ANALYZE PODCAST TRANSCRIPT
-- Title: {metadata.title}
-- Podcast: {metadata.formatted_podcast_name}
-- Host: {metadata.host.name if metadata.host else 'Unknown'}
-- Guest: {metadata.guest.get_speaker_attribution() if metadata.guest else 'Unknown'}{config_status}
-- Duration: 00:00:00 to {end}
-
-### GOAL
-Create **at least {min_cards}** atomic notecards in Ryan Holiday's style - each focused on a single powerful quote or insight. Think of each card as a future building block for writing or thinking.
-
-### NOTECARD FORMAT
-> [!note] Notecard #{{{{ number }}}}
-> [{{{{ HH:MM:SS }}}}]({url_base}{{{{ 1h2m3s format }}}})
-> 
-> "{{{{ powerful quote or key insight }}}}"
-> - {metadata.guest.name if metadata.guest else 'Guest'} [or "{metadata.formatted_podcast_name}"]
-> 
-> #{{{{ mainCategory }}}}/{{{{ subCategory }}}} #{{{{ additionalTags }}}}
-
-### TIMESTAMP FORMAT
-- Display format: [HH:MM:SS]
-- URL format: Add timestamp in 1h2m3s format
-- Examples:
-  - [00:05:30] -> {url_base}5m30s
-  - [01:15:45] -> {url_base}1h15m45s
-  - [02:00:00] -> {url_base}2h
-
-### KEY PRINCIPLES
-1. **Quote Selection**
-   - Choose quotes that stand alone as powerful insights
-   - Focus on timeless wisdom over contextual discussion
-   - Capture surprising or counterintuitive ideas
-
-2. **Formatting**
-   - Top: Timestamp as YouTube link
-   - Middle: The quote (the star of the show)
-   - Bottom: Speaker attribution and tags
-   - Tags: Use hierarchical format (#main/sub)
-
-3. **Cross-References**
-   - If ideas connect: "See card #X for related insight"
-   - If claims conflict: "Contradicts card #X"
-   - Keep these brief and only when truly valuable
-
-### REVIEW PASS
-After creating initial cards:
-1. Remove any redundant cards
-2. Ensure each quote is powerful enough to stand alone
-3. Verify all timestamps and speaker attributions
-4. Check tag consistency (#main/sub format)
-
-### FINAL CHECKBOXES
-- "[ ] I confirm at least {min_cards} atomic notecards produced"
-- "[ ] I confirm each card captures a standalone insight"
-- "[ ] I confirm all cards follow the exact format specified"
-
-### SPEAKER ATTRIBUTION
-When attributing quotes, use this priority:
-1. Known speaker name (e.g., "{metadata.guest.name if metadata.guest else 'Guest'}")
-2. Podcast name with episode (e.g., "{metadata.formatted_podcast_name}")
-3. Channel name (e.g., "{metadata.youtube_metadata.channel_title if metadata.youtube_metadata else ''}")
-
-\\#podcast-analysis \\#transcripts \\#{metadata.platform_type}-podcast"""
-
-    return {"notecard_analysis": prompt}
+    return {
+        "atomic_notes": prompt
+    }
 
 def format_timestamp(seconds: int) -> str:
     """Format seconds into HH:MM:SS"""

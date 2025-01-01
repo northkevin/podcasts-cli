@@ -7,6 +7,7 @@ from unittest.mock import patch, mock_open, MagicMock
 from podcasts.lib.fetch.youtube import YouTubeFetcher
 from podcasts.lib.models.base import Speaker, YouTubeMetadata
 from podcasts.lib.models.podcast_config import PodcastConfig
+from podcasts.lib.generators.prompt_atomic import generate_atomic_prompts
 
 # Mock YouTube API service document
 MOCK_YOUTUBE_API = {
@@ -148,14 +149,74 @@ def test_preset_tags(youtube_fetcher):
     assert 'education' in tags
 
 @pytest.mark.integration
-def test_real_api_call():
-    """Integration test with real YouTube API"""
+def test_real_youtube_fetch():
+    """Test fetching real YouTube video data"""
     api_key = os.getenv('YOUTUBE_API_KEY')
     if not api_key:
         pytest.skip("YOUTUBE_API_KEY environment variable not set")
     
+    # Using a known video (Rick Astley - Never Gonna Give You Up)
+    video_url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    
     with patch.object(YouTubeFetcher, '_load_podcast_configs', return_value={}):
         fetcher = YouTubeFetcher(api_key)
-        metadata = fetcher.get_video_data("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-        assert metadata.title
-        assert metadata.youtube_metadata.channel_id 
+        metadata = fetcher.get_video_data(video_url)
+        
+        # Basic metadata
+        assert metadata.title == "Rick Astley - Never Gonna Give You Up (Official Music Video)"
+        assert "Rick Astley" in metadata.description
+        assert metadata.duration_seconds > 0
+        
+        # YouTube specific metadata
+        assert metadata.youtube_metadata.channel_id
+        assert metadata.youtube_metadata.channel_title
+        assert metadata.youtube_metadata.video_id == "dQw4w9WgXcQ"
+        
+        # Thumbnail
+        assert metadata.youtube_metadata.thumbnail_url
+        assert metadata.youtube_metadata.thumbnail_url.startswith("https://i.ytimg.com/")
+        
+        # Speakers
+        assert metadata.host
+        assert metadata.guest
+        
+        # Try to get transcript (might not be available)
+        try:
+            transcript = fetcher.get_transcript(video_url)
+            assert transcript.entries
+            assert transcript.stats
+            assert transcript.stats.words > 0
+        except ValueError as e:
+            if "Could not get transcript" not in str(e):
+                raise 
+
+@pytest.mark.integration
+def test_real_video_prompt():
+    """Test generating prompt for a real video"""
+    api_key = os.getenv('YOUTUBE_API_KEY')
+    if not api_key:
+        pytest.skip("YOUTUBE_API_KEY environment variable not set")
+    
+    video_url = "https://www.youtube.com/watch?v=SiBFtwbyv44"
+    
+    with patch.object(YouTubeFetcher, '_load_podcast_configs', return_value={}):
+        fetcher = YouTubeFetcher(api_key)
+        metadata = fetcher.get_video_data(video_url)
+        
+        # Generate prompt
+        prompts = generate_atomic_prompts(metadata)
+        prompt = prompts["atomic_notes"]
+        
+        # Verify thumbnail is included
+        assert "![[" in prompt
+        assert "maxresdefault.jpg" in prompt or "hqdefault.jpg" in prompt
+        
+        # Verify basic structure
+        assert "# " in prompt  # Title
+        assert "## Metadata" in prompt
+        assert "## Description" in prompt
+        assert "## Notes" in prompt
+        
+        # Print prompt for manual inspection
+        print("\nGenerated Prompt:\n")
+        print(prompt) 
