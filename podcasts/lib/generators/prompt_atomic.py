@@ -1,116 +1,100 @@
-from typing import Dict, Optional
-from pathlib import Path
-import logging
-from datetime import datetime
-
-from ..models.schemas import Interviewee
-
-logger = logging.getLogger(__name__)
+import re
+from typing import Dict
+from ..models.schemas import PodcastMetadata
 
 def generate_atomic_prompts(
-    title: str,
-    podcast_name: str,
-    episode_id: str,
-    share_url: str,
-    transcript_filename: str,
-    platform_type: str,
-    interviewee: Interviewee,
-    duration_seconds: int,
-    transcript_stats: dict = None,  # New parameter for transcript stats
+    metadata: PodcastMetadata,
+    transcript_stats: dict = None,
     cards_per_hour: int = 5
 ) -> Dict[str, str]:
-    """Generate atomic prompts for podcast analysis focusing on granular notecards"""
+    """Generate atomic prompts with config-aware metadata"""
     
     # Calculate duration info
-    end = format_timestamp(duration_seconds)
-    duration_str = format_duration(duration_seconds)
-    hours = duration_seconds / 3600
+    end = format_timestamp(metadata.duration_seconds)
+    hours = metadata.duration_seconds / 3600
     min_cards = int(hours * cards_per_hour)
     
-    # Format transcript stats if provided
-    stats_str = ""
-    if transcript_stats:
-        stats_str = f"Approximate Transcript Size: ~{transcript_stats['words']:,} words / ~{transcript_stats['chars']:,} characters\n"
+    # Generate timestamped URL format
+    video_id = metadata.url.split("v=")[-1]
+    url_base = f"https://youtube.com/watch?v={video_id}&t="
     
-    prompt = f"""GRANULAR NOTECARDS PROMPT (Ryan Holiday–Style)
-ANALYZE PODCAST TRANSCRIPT: {title}
+    # Format preset tags if available
+    preset_tags_str = ""
+    if metadata.preset_tags:
+        preset_tags_str = "\nSuggested tags:\n" + "\n".join(
+            f"- #{tag}" for tag in metadata.preset_tags
+        )
+    
+    # Add note about config status
+    config_status = ""
+    if metadata.youtube_metadata and metadata.youtube_metadata.channel_id in fetcher.configs:
+        config_status = "\n✓ Using configured podcast metadata"
+    else:
+        config_status = "\n⚠️ Using default metadata - configure in podcast_configs.json for better results"
+    
+    prompt = f"""ANALYZE PODCAST TRANSCRIPT
+- Title: {metadata.title}
+- Podcast: {metadata.formatted_podcast_name}
+- Host: {metadata.host.name if metadata.host else 'Unknown'}
+- Guest: {metadata.guest.get_speaker_attribution() if metadata.guest else 'Unknown'}{config_status}
+- Duration: 00:00:00 to {end}
 
-METADATA (For reference and context):
-Title: {title}
-Podcast: {podcast_name}
-Guest: {interviewee.name}
-Role: {interviewee.profession}
-Organization: {interviewee.organization}
-Duration: {duration_str} (00:00:00 to {end})
-{stats_str}Transcript File: {transcript_filename}
+### GOAL
+Create **at least {min_cards}** atomic notecards in Ryan Holiday's style - each focused on a single powerful quote or insight. Think of each card as a future building block for writing or thinking.
 
-BEFORE YOU BEGIN
-Read the entire transcript from 00:00:00 to {end} in full, before providing any output.
+### NOTECARD FORMAT
+> [!note] Notecard #{{{{ number }}}}
+> [{{{{ HH:MM:SS }}}}]({url_base}{{{{ 1h2m3s format }}}})
+> 
+> "{{{{ powerful quote or key insight }}}}"
+> - {metadata.guest.name if metadata.guest else 'Guest'} [or "{metadata.formatted_podcast_name}"]
+> 
+> #{{{{ mainCategory }}}}/{{{{ subCategory }}}} #{{{{ additionalTags }}}}
 
-In your very first sentence, confirm you have done so, for example:
-"I confirm I have read the entire transcript from start to finish."
+### TIMESTAMP FORMAT
+- Display format: [HH:MM:SS]
+- URL format: Add timestamp in 1h2m3s format
+- Examples:
+  - [00:05:30] -> {url_base}5m30s
+  - [01:15:45] -> {url_base}1h15m45s
+  - [02:00:00] -> {url_base}2h
 
-Keep Both Detail and Context in Mind
-- Focus on granular, atomic notecards (the "trees"), but remain aware of recurring themes and broader ideas (the "forest").
+### KEY PRINCIPLES
+1. **Quote Selection**
+   - Choose quotes that stand alone as powerful insights
+   - Focus on timeless wisdom over contextual discussion
+   - Capture surprising or counterintuitive ideas
 
-NOTECARD GENERATION
-Goal: Produce atomized insights—quotes, claims, or anecdotes—similar to Ryan Holiday's physical note-card system, ensuring no major point is overlooked.
+2. **Formatting**
+   - Top: Timestamp as YouTube link
+   - Middle: The quote (the star of the show)
+   - Bottom: Speaker attribution and tags
+   - Tags: Use hierarchical format (#main/sub)
 
-Notecards Per Hour
-- For a {duration_str} podcast, create ~{cards_per_hour} notecards per hour, totaling at least {min_cards} notecards.
-- If any segment is dense or significant, add additional notecards instead of skipping potentially important details.
+3. **Cross-References**
+   - If ideas connect: "See card #X for related insight"
+   - If claims conflict: "Contradicts card #X"
+   - Keep these brief and only when truly valuable
 
-Atomic Format
-- One idea or quote per notecard—avoid grouping unrelated points.
-- Each notecard must be an Obsidian callout of type "note".
+### REVIEW PASS
+After creating initial cards:
+1. Remove any redundant cards
+2. Ensure each quote is powerful enough to stand alone
+3. Verify all timestamps and speaker attributions
+4. Check tag consistency (#main/sub format)
 
-Notecard Template
-Use the following structure for each notecard:
+### FINAL CHECKBOXES
+- "[ ] I confirm at least {min_cards} atomic notecards produced"
+- "[ ] I confirm each card captures a standalone insight"
+- "[ ] I confirm all cards follow the exact format specified"
 
-```
-> [!note] Notecard #{{{{ sequentialNumber }}}}
-> **Theme/Tag(s):** #{{{{ mainTheme }}}} #{{{{ subTheme }}}} #{{{{ context }}}}
-> **Timestamp:** HH:MM:SS
-> **Key Idea/Quote:** "{{{{ direct quote or paraphrased idea }}}}" – {interviewee.name}
-> **Significance/Use:** In 1–2 sentences, explain why this point matters or where it might be applied.
-```
+### SPEAKER ATTRIBUTION
+When attributing quotes, use this priority:
+1. Known speaker name (e.g., "{metadata.guest.name if metadata.guest else 'Guest'}")
+2. Podcast name with episode (e.g., "{metadata.formatted_podcast_name}")
+3. Channel name (e.g., "{metadata.youtube_metadata.channel_title if metadata.youtube_metadata else ''}")
 
-Formatting Notes:
-- Always use "{interviewee.name}" as the speaker name for direct quotes.
-- Include relevant sub-tags (e.g. #biology/quantum) for specialized topics.
-- If a concept is mentioned at multiple timestamps, reference them accordingly.
-
-Cross-References & Overarching Themes
-Even though you are creating small, granular notes, remain mindful of connections:
-- If you see repeated concepts or claims, cross-link them by saying "See also Notecard #X" or "Previously mentioned at HH:MM:SS."
-- If you sense an overarching theme, highlight it briefly in "Theme/Tag(s)."
-
-Avoid Omissions
-- If you suspect a minor point might matter later (e.g., an anecdote, a tangential concept), create a separate notecard.
-- If uncertain about relevance, include it—along with a timestamp—so the user can decide post-analysis.
-
-REVIEW PASS (Second Pass)
-After generating your initial set of notecards:
-
-Double-Check for Missing Insights
-- Revisit the transcript highlights: Did you capture every recurring idea, claim, or reference?
-- If something was only vaguely referenced but might have deeper significance, add a notecard.
-
-Ensure Cross-Links
-- Confirm that repeated ideas/claims are consistently cross-referenced.
-- If you notice contradictions, note them explicitly in each relevant notecard.
-
-Maintain Context
-- If any notecard's significance is unclear, expand its "Significance/Use" by 1–2 sentences.
-- Indicate completion of this second pass at the end of your output.
-
-CONFIRMATION & COMPLETENESS
-After finalizing notecards and completing the review pass, include these checkboxes:
-- "[ ] I confirm I have read the entire transcript from 00:00:00 to {end}."
-- "[ ] I confirm all significant topics are captured in atomic notecards."
-- "[ ] I confirm a second review pass was performed to ensure completeness and cross-links."
-
-#podcast-analysis #transcripts #{platform_type}-podcast"""
+\\#podcast-analysis \\#transcripts \\#{metadata.platform_type}-podcast"""
 
     return {"notecard_analysis": prompt}
 
@@ -125,4 +109,41 @@ def format_duration(seconds: int) -> str:
     """Format duration in human readable form"""
     hours = seconds // 3600
     minutes = (seconds % 3600) // 60
-    return f"{hours} hours, {minutes} minutes" 
+    return f"{hours} hours, {minutes} minutes"
+
+def format_youtube_timestamp(seconds: int) -> str:
+    """Format seconds into YouTube timestamp format (1h2m3s)"""
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+    
+    parts = []
+    if hours > 0:
+        parts.append(f"{hours}h")
+    if minutes > 0:
+        parts.append(f"{minutes}m")
+    if secs > 0 or not parts:  # include seconds if it's the only value
+        parts.append(f"{secs}s")
+    
+    return "".join(parts) 
+
+def validate_youtube_timestamp(timestamp: str) -> bool:
+    """Validate YouTube timestamp format (1h2m3s)"""
+    # Pattern matches formats like 1h, 2m, 3s, 1h2m, 2m3s, 1h2m3s
+    pattern = r'^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$'
+    
+    if not timestamp:
+        return False
+        
+    match = re.match(pattern, timestamp)
+    if not match:
+        return False
+        
+    # Ensure at least one value is present
+    return any(g for g in match.groups() if g is not None)
+
+def convert_timestamp_to_youtube(timestamp: str) -> str:
+    """Convert HH:MM:SS to YouTube timestamp format"""
+    hours, minutes, seconds = map(int, timestamp.split(':'))
+    total_seconds = hours * 3600 + minutes * 60 + seconds
+    return format_youtube_timestamp(total_seconds) 

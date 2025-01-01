@@ -69,7 +69,7 @@ def cmd_add_podcast(url: str, platform: str) -> None:
         logger.error(f"Error adding podcast: {e}")
         raise
 
-def cmd_process_podcast(episode_id: str) -> None:
+def cmd_process_podcast(episode_id: str, prompt_type: str = "atomic") -> None:
     """Process a podcast episode"""
     try:
         # Get podcast entry
@@ -80,24 +80,42 @@ def cmd_process_podcast(episode_id: str) -> None:
         if not entry:
             raise ValueError(f"No podcast found with ID: {episode_id}")
 
+        logger.info(f"Processing podcast with prompt type: {prompt_type}")
+
         # Get transcript and stats
         fetcher = YouTubeFetcher(api_key=os.getenv('YOUTUBE_API_KEY'))
         transcript_data = fetcher.get_transcript(entry.url)
         transcript_stats = transcript_data.stats.model_dump() if transcript_data.stats else None
         
-        # Generate analysis prompt
-        prompt = generate_atomic_prompts(
-            title=entry.title,
-            podcast_name=entry.podcast_name,
-            episode_id=entry.episode_id,
-            share_url=entry.url,
-            transcript_filename=entry.transcripts_file,
-            platform_type=entry.platform,
-            interviewee=entry.interviewee,
-            duration_seconds=entry.duration_seconds,
-            transcript_stats=transcript_stats,
-            cards_per_hour=5
-        )
+        # Generate analysis prompt based on type
+        if prompt_type == "atomic":
+            logger.debug("Using atomic prompt generator")
+            prompt = generate_atomic_prompts(
+                title=entry.title,
+                podcast_name=entry.podcast_name,
+                episode_id=entry.episode_id,
+                share_url=entry.url,
+                transcript_filename=entry.transcripts_file,
+                platform_type=entry.platform,
+                interviewee=entry.interviewee,
+                duration_seconds=entry.duration_seconds,
+                transcript_stats=transcript_stats,
+                cards_per_hour=5
+            )["notecard_analysis"]
+        else:
+            logger.debug("Using standard prompt generator")
+            prompt = generate_analysis_prompt(
+                title=entry.title,
+                podcast_name=entry.podcast_name,
+                episode_id=entry.episode_id,
+                share_url=entry.url,
+                transcript_filename=entry.transcripts_file,
+                platform_type=entry.platform,
+                interviewee=entry.interviewee,
+                duration_seconds=entry.duration_seconds
+            )
+
+        logger.debug(f"Generated prompt of type {prompt_type} with length {len(prompt)} chars")
 
         # Ensure directories exist
         Config.ensure_dirs()
@@ -122,8 +140,8 @@ def cmd_process_podcast(episode_id: str) -> None:
             # Update transcript file path
             podcast_list.update_entry(episode_id, transcripts_file=str(transcript_path))
             
-            # Generate episode markdown
-            episode_file = markdown_gen.generate_episode_markdown(entry)
+            # Generate episode markdown with the prompt
+            episode_file = markdown_gen.generate_episode_markdown(entry, prompt=prompt)
             podcast_list.update_entry(episode_id, episodes_file=str(episode_file))
             
             # Final state update

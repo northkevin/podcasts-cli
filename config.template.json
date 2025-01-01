@@ -2,30 +2,5 @@
     "use_obsidian": false,
     "obsidian_vault_path": "~/Documents/Obsidian/YourVault",
     "episodes_dir": "Podcast Episodes",
-    "transcripts_dir": "Podcast Transcripts",
-    "YOUTUBE_API_KEY": "your-api-key-here",
-    "OBSIDIAN_VAULT": "/path/to/vault",
-    "podcast_list_schema": {
-        "type": "array",
-        "items": {
-            "type": "object",
-            "required": [
-                "episode_id",
-                "url",
-                "platform",
-                "title",
-                "description",
-                "published_at",
-                "podcast_name",
-                "interviewee",
-                "duration_seconds"
-            ],
-            "properties": {
-                "duration_seconds": {
-                    "type": "integer",
-                    "description": "Duration of the podcast in seconds"
-                }
-            }
-        }
-    }
+    "transcripts_dir": "Podcast Transcripts"
 }

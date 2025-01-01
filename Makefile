@@ -14,7 +14,10 @@ clean:
 	find . -type f -name "*.pyc" -delete
 
 test:
-	pytest
+	python -m pytest podcasts/tests/ -v
+
+test-debug:
+	python -m pytest podcasts/tests/ -v --pdb
 
 lint:
 	flake8 podcasts

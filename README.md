@@ -20,9 +20,10 @@ pip install -e .
 
 ## Environment Setup
 
-Create a `.env` file in the root directory:
+Create a `.env` file in the root directory or add to your shell configuration (e.g., .zshrc, .bashrc):
 ```bash
-YOUTUBE_API_KEY=your_api_key_here
+# Required for YouTube API access
+export YOUTUBE_API_KEY=your_api_key_here
 ```
 
 ## Configuration
@@ -137,3 +138,14 @@ Each podcast entry contains:
 - `status`: Processing status
 - `episodes_file`: Path to episode markdown file
 - `transcripts_file`: Path to transcript file
+
+## Testing
+
+Tests require a valid YouTube API key to be set in your environment:
+```bash
+# Ensure YOUTUBE_API_KEY is set
+echo $YOUTUBE_API_KEY
+
+# Run tests
+make test
+```

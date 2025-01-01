@@ -33,6 +33,8 @@ def main():
     # Process podcast command
     process_parser = subparsers.add_parser("process-podcast")
     process_parser.add_argument("--episode_id", required=True)
+    process_parser.add_argument("--prompt-type", choices=["atomic", "standard"], 
+                              default="atomic", help="Type of analysis prompt to use")
     
     # Cleanup podcast command
     cleanup_parser = subparsers.add_parser("cleanup-podcast")
@@ -69,7 +71,8 @@ def main():
         elif args.command == "add-podcast":
             cmd_add_podcast(args.url, args.platform)
         elif args.command == "process-podcast":
-            cmd_process_podcast(args.episode_id)
+            logger.debug(f"Processing podcast with args: episode_id={args.episode_id}, prompt_type={args.prompt_type}")
+            cmd_process_podcast(args.episode_id, args.prompt_type)
         elif args.command == "cleanup-podcast":
             cmd_cleanup_episode(args.episode_id)
         elif args.command == "config":

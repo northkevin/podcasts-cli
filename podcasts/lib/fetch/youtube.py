@@ -1,8 +1,9 @@
 import re
 import json
 import logging
-from typing import Dict
+from typing import Dict, Optional, Tuple, List
 from datetime import datetime
+from pathlib import Path
 
 from googleapiclient.discovery import build
 from youtube_transcript_api import YouTubeTranscriptApi
@@ -10,15 +11,61 @@ from googleapiclient.errors import HttpError
 from isodate import parse_duration
 
 from ...config import Config
-from ..models.schemas import Metadata, Interviewee, TranscriptData, TranscriptStats
+from ..models.schemas import (
+    Metadata, 
+    Interviewee, 
+    TranscriptData, 
+    TranscriptStats,
+    Speaker,
+    YouTubeMetadata
+)
 from ..processors.transcript import TranscriptService
+from ..models.podcast_config import PodcastConfig, PodcastHost
 
 logger = logging.getLogger(__name__)
 
 class YouTubeFetcher:
     def __init__(self, api_key: str):
-        self.youtube = build('youtube', 'v3', developerKey=api_key)
+        logger.debug(f"Initializing YouTubeFetcher with API key: {api_key[:5]}...")
+        try:
+            self.youtube = build('youtube', 'v3', developerKey=api_key, cache_discovery=False)
+            logger.debug("Successfully initialized YouTube API client")
+        except Exception as e:
+            logger.error(f"Failed to initialize YouTube API client: {str(e)}")
+            raise
+            
         self.transcript_service = TranscriptService()
+        self.configs = self._load_podcast_configs()
+        logger.debug(f"Loaded {len(self.configs)} podcast configs")
+    
+    def _load_podcast_configs(self) -> dict:
+        """Load podcast configurations"""
+        config_path = Path(__file__).parent.parent.parent / "dist" / "podcast_configs.json"
+        logger.debug(f"Looking for podcast configs at: {config_path}")
+        if config_path.exists():
+            try:
+                configs = json.loads(config_path.read_text())
+                logger.debug(f"Found {len(configs)} podcast configs")
+                return configs
+            except Exception as e:
+                logger.error(f"Error loading podcast configs: {str(e)}")
+                return {}
+        logger.debug("No podcast configs found")
+        return {}
+    
+    def _get_podcast_config(self, channel_id: str) -> Optional[PodcastConfig]:
+        """Get podcast config by channel ID"""
+        logger.debug(f"Looking for config with channel_id: {channel_id}")
+        logger.debug(f"Available configs: {self.configs}")
+        
+        # The configs are nested under names, so we need to check each config's channel_id
+        for config_data in self.configs.values():
+            if isinstance(config_data, dict) and config_data.get('channel_id') == channel_id:
+                logger.debug(f"Found matching config: {config_data}")
+                return PodcastConfig(**config_data)
+        
+        logger.debug(f"No config found for channel_id: {channel_id}")
+        return None
     
     def get_video_data(self, url: str) -> Metadata:
         """Get video metadata from YouTube"""
@@ -27,9 +74,8 @@ class YouTubeFetcher:
             raise ValueError(f"Could not extract video ID from URL: {url}")
         
         try:
-            # Request both snippet and contentDetails for duration
             response = self.youtube.videos().list(
-                part='snippet,contentDetails',  # Add contentDetails for duration
+                part='snippet,contentDetails',
                 id=video_id
             ).execute()
             
@@ -38,25 +84,59 @@ class YouTubeFetcher:
             
             video_data = response['items'][0]
             snippet = video_data['snippet']
+            channel_id = snippet['channelId']
             
-            # Parse duration from ISO 8601 format
+            # Get best available thumbnail
+            thumbnail_url = None
+            if 'thumbnails' in snippet:
+                thumbnails = snippet['thumbnails']
+                # Try to get highest quality thumbnail
+                for quality in ['maxres', 'high', 'medium', 'default']:
+                    if quality in thumbnails:
+                        thumbnail_url = thumbnails[quality]['url']
+                        break
+            
+            # Get config if available
+            config = self._get_podcast_config(channel_id)
+            
+            # Parse duration
             duration_iso = video_data['contentDetails']['duration']
             duration_seconds = int(parse_duration(duration_iso).total_seconds())
             
-            return Metadata(
+            # Extract speakers using config-aware method
+            host, guest = self._extract_speakers(snippet, {'snippet': {'title': snippet['channelTitle']}})
+            
+            # Create interviewee from guest
+            interviewee = Interviewee(
+                name=guest.name,
+                profession=self._extract_profession(snippet),
+                organization=self._extract_organization(snippet)
+            )
+
+            # Create metadata with enhanced information
+            metadata = Metadata(
                 title=snippet['title'],
                 description=snippet['description'],
                 published_at=datetime.strptime(snippet['publishedAt'], '%Y-%m-%dT%H:%M:%SZ'),
-                podcast_name=self._extract_podcast_name(snippet),
+                podcast_name=config.name if config else self._extract_podcast_name(snippet),
                 url=url,
-                interviewee=Interviewee(
-                    name=self._extract_interviewee_name(snippet),
-                    profession=self._extract_profession(snippet),
-                    organization=self._extract_organization(snippet)
-                ),
+                host=host,
+                guest=guest,
+                interviewee=interviewee,
                 webvtt_url="",
-                duration_seconds=duration_seconds  # Add duration to metadata
+                duration_seconds=duration_seconds,
+                youtube_metadata=YouTubeMetadata(
+                    channel_id=channel_id,
+                    channel_title=snippet['channelTitle'],
+                    channel_url=f"https://youtube.com/channel/{channel_id}",
+                    video_id=video_id,
+                    category_id=snippet.get('categoryId', ''),
+                    tags=snippet.get('tags', []),
+                    thumbnail_url=thumbnail_url
+                )
             )
+            
+            return metadata
             
         except HttpError as e:
             logger.error(f"YouTube API error: {str(e)}")
@@ -136,13 +216,72 @@ class YouTubeFetcher:
             transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
             transcript_data = TranscriptData(entries=transcript_list)
             
-            # Calculate stats from formatted text
-            formatted_text = transcript_data.format()
-            stats = TranscriptStats.from_text(formatted_text)
-            transcript_data.stats = stats  # Add stats to transcript data
+            # Calculate stats from text only (no timestamps)
+            text_only = transcript_data.get_text_only()
+            stats = TranscriptStats.from_text(text_only)
+            transcript_data.stats = stats
             
             return transcript_data
             
         except Exception as e:
             logger.error(f"Error fetching transcript: {str(e)}")
             raise ValueError(f"Could not get transcript: {str(e)}")
+
+    def _extract_speakers(self, snippet: Dict, channel: Optional[Dict]) -> Tuple[Optional[Speaker], Optional[Speaker]]:
+        """Extract host and guest information using configs when available"""
+        channel_id = snippet.get('channelId')
+        logger.debug(f"Extracting speakers for channel_id: {channel_id}")
+        
+        config = self._get_podcast_config(channel_id) if channel_id else None
+        logger.debug(f"Found config: {config}")
+        
+        if config and hasattr(config, 'host'):  # Check if config has host attribute
+            logger.debug(f"Using configured host: {config.host}")
+            # Use configured host
+            host = Speaker(
+                name=config.host.name,
+                title=config.host.title,
+                role=config.host.role
+            )
+        else:
+            logger.debug("Using default channel title as host")
+            # Default to channel name as host
+            host = Speaker(
+                name=channel['snippet']['title'] if channel else snippet['channelTitle'],
+                role="Host"
+            )
+        
+        # For guest, just use truncated title if no config
+        title = snippet.get('title', '')
+        if len(title) > 20:
+            guest_name = f"{title[:17]}..."  # Consistently use 17 chars
+        else:
+            guest_name = title
+            
+        guest = Speaker(
+            name=guest_name,
+            role="Guest"
+        )
+        
+        return host, guest
+
+    def _generate_preset_tags(self, snippet: Dict, youtube_metadata: YouTubeMetadata) -> List[str]:
+        """Generate preset tags from video data"""
+        tags = set()
+        
+        # Add YouTube tags if available
+        if youtube_metadata.tags:
+            tags.update(tag.lower().replace(' ', '_') for tag in youtube_metadata.tags)
+        
+        # Add category-based tags
+        category_map = {
+            '27': 'education',
+            '28': 'science_technology',
+            '22': 'people_blogs',
+            '24': 'entertainment'
+        }
+        if category_id := youtube_metadata.category_id:
+            if category_tag := category_map.get(category_id):
+                tags.add(category_tag)
+        
+        return sorted(list(tags))
